@@ -155,41 +155,83 @@ exports.register = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
-    const exists = await User.findOne({ email });
-    if (exists) return res.status(400).json({ message: 'Email ya registrado' });
+    // ── Validación básica de campos ───────────────────────────────────────
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Nombre, email y contraseña son obligatorios' });
+    }
 
+    console.log(`📝 Intento de registro — email: ${email} | nombre: ${name} | rol: ${role}`);
+
+    // ── Verificar si el email ya existe ───────────────────────────────────
+    const exists = await User.findOne({ email });
+    if (exists) {
+      console.warn(`⚠️  Email ya registrado: ${email}`);
+      return res.status(400).json({ message: 'Email ya registrado' });
+    }
+
+    // ── Hash de contraseña ────────────────────────────────────────────────
     const hashed  = await bcrypt.hash(password, 10);
     const code    = Math.floor(100000 + Math.random() * 900000).toString();
     const expires = Date.now() + 10 * 60 * 1000;
 
+    console.log(`🔑 Código de verificación generado: ${code} | Expira: ${new Date(expires).toISOString()}`);
+
+    // ── Crear usuario ─────────────────────────────────────────────────────
     const user = await User.create({
       name, email, password: hashed, role,
       verificationCode: code,
       verificationCodeExpires: expires,
     });
 
+    console.log(`✅ Usuario creado en DB — ID: ${user._id} | email: ${email}`);
+
+    // ── Generar JWT ───────────────────────────────────────────────────────
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
-    // Enviar email en background — no bloqueamos la respuesta
+    // ── Enviar email de verificación (background) ─────────────────────────
+    console.log(`📤 Iniciando envío de email a: ${email}`);
+
     sendEmail(
       email,
       '🔐 Código de verificación — Offerton',
       `Tu código de verificación es: ${code}. Válido por 10 minutos.`,
       verificationEmailHTML(code, name)
-    ).catch(err => console.error('Error enviando email de verificación:', err));
+    )
+      .then(() => {
+        console.log(`✅ Email de verificación enviado correctamente a: ${email}`);
+      })
+      .catch(err => {
+        console.error(`❌ FALLO al enviar email de verificación`);
+        console.error(`   Destinatario : ${email}`);
+        console.error(`   Error código : ${err.code        || 'N/A'}`);
+        console.error(`   Error mensaje: ${err.message     || 'N/A'}`);
+        console.error(`   SMTP response: ${err.response    || 'N/A'}`);
+        console.error(`   SMTP command : ${err.command     || 'N/A'}`);
+        console.error(`   Stack        :`, err.stack);
+      });
 
+    // ── Respuesta al cliente ──────────────────────────────────────────────
     res.status(201).json({
       message: 'Usuario registrado. Verificá tu email.',
       token,
-      user,
+      user: {
+        _id:        user._id,
+        name:       user.name,
+        email:      user.email,
+        role:       user.role,
+        isVerified: user.isVerified,
+      },
     });
 
+    console.log(`🎉 Registro completado exitosamente para: ${email}`);
+
   } catch (err) {
-    console.error(err);
+    console.error('❌ Error inesperado en register:');
+    console.error('   Mensaje:', err.message);
+    console.error('   Stack:',   err.stack);
     res.status(500).json({ message: 'Error servidor' });
   }
 };
-
 // ── VERIFY ────────────────────────────────────────────────────────────────
 exports.verifyUser = async (req, res) => {
   try {
@@ -246,3 +288,4 @@ exports.resendVerificationCode = async (req, res) => {
     res.status(500).json({ message: 'Error servidor' });
   }
 };
+
