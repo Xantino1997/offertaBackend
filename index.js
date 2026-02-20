@@ -14,6 +14,7 @@ const cartRoutes    = require('./routes/cartRoute');
 const orderRoutes   = require('./routes/orderRoute');
 const chatRoutes    = require('./routes/chatRoute');
 
+
 const { startAbandonedCartJob } = require('./jobs/abandonedCartEmail');
 const { initSocket }            = require('./socket');
 
@@ -50,4 +51,5 @@ app.set('io', io);
 // ✅ CAMBIO CLAVE: usar el puerto dinámico
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
 
