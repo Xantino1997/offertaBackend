@@ -1,6 +1,11 @@
 // models/businessModel.js
 const mongoose = require("mongoose");
 
+const VALID_CATEGORIES = [
+  "tecnologia", "ropa", "alimentos", "hogar",
+  "deportes", "belleza", "mascotas", "juguetes",
+];
+
 const businessSchema = new mongoose.Schema(
   {
     name:         { type: String, required: true },
@@ -9,13 +14,24 @@ const businessSchema = new mongoose.Schema(
     logo:         String,
     logoPublicId: String,
     rating:       { type: Number, default: 0 },
-    totalRatings: { type: Number, default: 0 },   // ← NUEVO: cantidad de votos
-    ratingSum:    { type: Number, default: 0 },    // ← NUEVO: suma de votos
+    totalRatings: { type: Number, default: 0 },
+    ratingSum:    { type: Number, default: 0 },
     totalProducts:{ type: Number, default: 0 },
     verified:     { type: Boolean, default: false },
     blocked:      { type: Boolean, default: false },
     blockedReason:{ type: String },
-    followers:    [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // ← NUEVO
+    followers:    [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+
+    // ─── Categorías (máximo 2) ───────────────────────────────────────────────
+    categories: {
+      type: [{ type: String, enum: VALID_CATEGORIES }],
+      default: [],
+      validate: {
+        validator: (arr) => arr.length <= 2,
+        message: "Un negocio puede tener máximo 2 categorías",
+      },
+    },
+
     owner: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
