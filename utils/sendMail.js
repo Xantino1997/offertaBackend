@@ -2,16 +2,15 @@ const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
+  port: 587,        // ← cambio de 465 a 587
+  secure: false,    // ← false porque 587 usa STARTTLS
   auth: {
-    user: "gjoaquinreynoso@gmail.com",
-    pass: "rrfm mrzs vvxq rdjf",
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
   },
   connectionTimeout: 15000,
   greetingTimeout: 15000,
   socketTimeout: 15000,
-  // ✅ Forzar IPv4 — fix para Render (evita ENETUNREACH por IPv6)
   family: 4,
 });
 
@@ -58,4 +57,5 @@ const sendEmail = async (to, subject, text, html) => {
 };
 
 module.exports = sendEmail;
+
 
