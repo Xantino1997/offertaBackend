@@ -24,7 +24,7 @@ const app = express();
 connectDB();
 
 app.use(cors({
-  origin:  'https://offerta-six.vercel.app/' || 'http://localhost:3000',
+  origin:  'https://offerta-six.vercel.app',
   credentials: true,
 }));
 app.use(express.json());
@@ -51,5 +51,6 @@ app.set('io', io);
 // ✅ CAMBIO CLAVE: usar el puerto dinámico
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
 
 
