@@ -11,6 +11,8 @@ const transporter = nodemailer.createTransport({
   connectionTimeout: 15000,
   greetingTimeout: 15000,
   socketTimeout: 15000,
+  // ✅ Forzar IPv4 — fix para Render (evita ENETUNREACH por IPv6)
+  family: 4,
 });
 
 // Test de conexión al arrancar el servidor
@@ -51,7 +53,7 @@ const sendEmail = async (to, subject, text, html) => {
     console.error('   Mensaje:', err.message);
     console.error('   Respuesta SMTP:', err.response || 'sin respuesta');
     console.error('   Command:', err.command || 'N/A');
-    throw err; // re-lanzamos para que el .catch() del caller también lo vea
+    throw err;
   }
 };
 
