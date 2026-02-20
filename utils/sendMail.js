@@ -8,25 +8,28 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 10000,
+  connectionTimeout: 15000,
+  greetingTimeout: 15000,
+  socketTimeout: 15000,
+});
+
+// Test de conexión al arrancar el servidor
+transporter.verify((error, success) => {
+  if (error) {
+    console.error('❌ SMTP no conecta:', error.message);
+  } else {
+    console.log('✅ SMTP listo para enviar emails');
+  }
 });
 
 const sendEmail = async (to, subject, text, html) => {
-  try {
-    await transporter.sendMail({
-      from: `"Offerton" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      text,
-      html: html || text,
-    });
-    console.log(`✅ Email enviado a ${to}`);
-  } catch (err) {
-    console.error('❌ Error enviando email:', err);
-    throw err;
-  }
+  await transporter.sendMail({
+    from: `"Offerton" <${process.env.EMAIL_USER}>`,
+    to,
+    subject,
+    text,
+    html: html || text,
+  });
 };
 
 module.exports = sendEmail;
