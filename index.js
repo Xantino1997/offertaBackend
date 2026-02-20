@@ -29,6 +29,10 @@ app.use(cors({
 }));
 app.use(express.json());
 
+app.get('/', (req, res) => {
+  res.send('Hola! El servidor está vivo 👍');
+});
+
 // Servir imágenes del chat (uploads locales)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -46,5 +50,6 @@ app.use('/api/chat',     chatRoutes);
 const httpServer = http.createServer(app);
 const io         = initSocket(httpServer);
 app.set('io', io);                    // disponible en rutas: req.app.get('io')
+
 
 httpServer.listen(5000, () => console.log('🚀 Server running on port 5000'));
