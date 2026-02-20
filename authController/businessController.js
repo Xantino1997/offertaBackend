@@ -4,10 +4,16 @@ const User = require("../models/userModel");
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
 
+const VALID_CATEGORIES = [
+  "tecnologia", "ropa", "alimentos", "hogar",
+  "deportes", "belleza", "mascotas", "juguetes",
+];
+
 /* ── UPSERT ── */
 exports.upsertBusiness = async (req, res) => {
   try {
     let logoUrl, logoPublicId;
+
     if (req.file) {
       const existing = await Business.findOne({ owner: req.user.id });
       if (existing?.logoPublicId) await cloudinary.uploader.destroy(existing.logoPublicId);
@@ -19,16 +25,39 @@ exports.upsertBusiness = async (req, res) => {
       logoPublicId = result.public_id;
       fs.unlinkSync(req.file.path);
     }
+
+    // ─── Parsear categorías ────────────────────────────────────────────────
+    let categories = [];
+    if (req.body.categories) {
+      // Puede llegar como JSON string o como campo repetido (FormData)
+      try {
+        categories = JSON.parse(req.body.categories);
+      } catch {
+        categories = Array.isArray(req.body.categories)
+          ? req.body.categories
+          : [req.body.categories];
+      }
+      // Filtrar solo valores válidos y limitar a 2
+      categories = categories
+        .filter((c) => VALID_CATEGORIES.includes(c))
+        .slice(0, 2);
+    }
+
     const updateData = {
-      name: req.body.name,
+      name:        req.body.name,
       description: req.body.description,
-      city: req.body.city,
-      owner: req.user.id,
+      city:        req.body.city,
+      categories,
+      owner:       req.user.id,
       ...(logoUrl && { logo: logoUrl, logoPublicId }),
     };
+
     const business = await Business.findOneAndUpdate(
-      { owner: req.user.id }, updateData, { new: true, upsert: true }
+      { owner: req.user.id },
+      updateData,
+      { new: true, upsert: true }
     );
+
     res.json(business);
   } catch (error) {
     console.error(error);
@@ -64,10 +93,8 @@ exports.followBusiness = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-
     await Business.findByIdAndUpdate(id, { $addToSet: { followers: userId } });
     await User.findByIdAndUpdate(userId, { $addToSet: { followingBusinesses: id } });
-
     const business = await Business.findById(id).select("followers");
     res.json({ followersCount: business.followers.length });
   } catch (error) {
@@ -80,10 +107,8 @@ exports.unfollowBusiness = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-
     await Business.findByIdAndUpdate(id, { $pull: { followers: userId } });
     await User.findByIdAndUpdate(userId, { $pull: { followingBusinesses: id } });
-
     const business = await Business.findById(id).select("followers");
     res.json({ followersCount: business.followers.length });
   } catch (error) {
@@ -114,7 +139,7 @@ exports.unfavoriteBusiness = async (req, res) => {
 /* ── RATE (1-5 estrellas) ── */
 exports.rateBusiness = async (req, res) => {
   try {
-    const { rating } = req.body; // número 1-5
+    const { rating } = req.body;
     if (!rating || rating < 1 || rating > 5)
       return res.status(400).json({ message: "Rating debe ser entre 1 y 5" });
 
@@ -122,22 +147,25 @@ exports.rateBusiness = async (req, res) => {
     const businessId = req.params.id;
 
     const user = await User.findById(userId);
-    const prevRating = user.ratedBusinesses.find(r => r.businessId.toString() === businessId);
+    const prevRating = user.ratedBusinesses.find(
+      (r) => r.businessId.toString() === businessId
+    );
 
     const business = await Business.findById(businessId);
     if (!business) return res.status(404).json({ message: "Negocio no encontrado" });
 
     if (prevRating) {
-      // Actualizar voto existente
       const newSum = business.ratingSum - prevRating.rating + rating;
       const newAvg = newSum / business.totalRatings;
-      await Business.findByIdAndUpdate(businessId, { ratingSum: newSum, rating: Math.round(newAvg * 10) / 10 });
+      await Business.findByIdAndUpdate(businessId, {
+        ratingSum: newSum,
+        rating: Math.round(newAvg * 10) / 10,
+      });
       await User.updateOne(
         { _id: userId, "ratedBusinesses.businessId": businessId },
         { $set: { "ratedBusinesses.$.rating": rating } }
       );
     } else {
-      // Nuevo voto
       const newTotal = business.totalRatings + 1;
       const newSum = (business.ratingSum || 0) + rating;
       const newAvg = newSum / newTotal;
@@ -158,26 +186,32 @@ exports.rateBusiness = async (req, res) => {
   }
 };
 
-/* ── SOCIAL STATUS (para saber si el user ya sigue/guardó/votó este negocio) ── */
+/* ── SOCIAL STATUS ── */
 exports.getBusinessSocialStatus = async (req, res) => {
   try {
     const userId = req.user.id;
     const businessId = req.params.id;
 
-    const user = await User.findById(userId).select("followingBusinesses favoriteBusinesses ratedBusinesses");
-    const business = await Business.findById(businessId).select("followers rating totalRatings");
+    const user = await User.findById(userId).select(
+      "followingBusinesses favoriteBusinesses ratedBusinesses"
+    );
+    const business = await Business.findById(businessId).select(
+      "followers rating totalRatings"
+    );
 
     if (!user || !business) return res.status(404).json({ message: "No encontrado" });
 
-    const ratedEntry = user.ratedBusinesses?.find(r => r.businessId.toString() === businessId);
+    const ratedEntry = user.ratedBusinesses?.find(
+      (r) => r.businessId.toString() === businessId
+    );
 
     res.json({
-      following: user.followingBusinesses.map(id => id.toString()).includes(businessId),
-      saved:     user.favoriteBusinesses.map(id => id.toString()).includes(businessId),
-      myRating:  ratedEntry?.rating || 0,
+      following:      user.followingBusinesses.map((id) => id.toString()).includes(businessId),
+      saved:          user.favoriteBusinesses.map((id) => id.toString()).includes(businessId),
+      myRating:       ratedEntry?.rating || 0,
       followersCount: business.followers.length,
-      rating:    business.rating,
-      totalRatings: business.totalRatings,
+      rating:         business.rating,
+      totalRatings:   business.totalRatings,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
